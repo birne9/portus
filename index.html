@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#071d28">
+  <meta name="description" content="PORTUS 全球港口图志——在交互海图中探索 3,802 座真实港口的位置、港型、水深与设施记录，数据为 2025 年 4 月版静态快照。">
+  <title>PORTUS · 全球港口图志</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23071d28'/%3E%3Cpath d='M32 9v38M20 22h24M15 39c2 10 9 15 17 15s15-5 17-15M12 39h10m20 0h10' fill='none' stroke='%237ce3c3' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='14' r='5' fill='none' stroke='%237ce3c3' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    :root {
+      --ink: #071d28;
+      --ink-deep: #04141d;
+      --ink-soft: #0d2b38;
+      --paper: #f1efe6;
+      --paper-bright: #faf9f4;
+      --sea: #7ce3c3;
+      --sea-dark: #1a8d79;
+      --orange: #ff9166;
+      --mist: #a8bec3;
+      --line: rgba(185, 218, 220, .17);
+      --body: "DM Sans", "Noto Sans SC", sans-serif;
+      --serif: "Instrument Serif", "Noto Serif SC", serif;
+      --shadow: 0 30px 80px rgba(0, 8, 14, .32);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--paper);
+      background: var(--ink);
+      font-family: var(--body);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body.drawer-open { overflow: hidden; }
+    button, input { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+    [hidden] { display: none !important; }
+    ::selection { color: var(--ink); background: var(--sea); }
+    :focus-visible { outline: 2px solid var(--orange); outline-offset: 4px; }
+    .skip-link {
+      position: fixed; left: 16px; top: -80px; z-index: 5000;
+      padding: 12px 18px; color: var(--ink); background: var(--sea); border-radius: 4px;
+    }
+    .skip-link:focus { top: 16px; }
+    .sr-only {
+      position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important;
+      margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important; border: 0 !important;
+    }
+    .noise {
+      position: fixed; inset: 0; z-index: 3000; pointer-events: none; opacity: .035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+    }
+    .eyebrow {
+      display: flex; align-items: center; gap: 12px; margin: 0 0 24px;
+      color: var(--sea); font-size: 11px; font-weight: 600; letter-spacing: .19em; text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 32px; height: 1px; background: currentColor; }
+    .button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 14px;
+      min-height: 52px; padding: 0 24px; border: 1px solid transparent; border-radius: 2px;
+      font-size: 13px; font-weight: 600; letter-spacing: .04em; cursor: pointer;
+      transition: color .25s, background .25s, border-color .25s, transform .25s;
+    }
+    .button-primary { color: var(--ink); background: var(--sea); }
+    .button-ghost { color: var(--paper); border-color: rgba(220, 239, 238, .3); background: transparent; }
+    .button svg { width: 18px; height: 18px; }
+    @media (hover: hover) {
+      .button-primary:hover { background: #a2f3da; transform: translateY(-2px); }
+      .button-ghost:hover { border-color: var(--sea); color: var(--sea); transform: translateY(-2px); }
+    }
+
+    /* Header */
+    .site-header {
+      position: absolute; inset: 0 0 auto; z-index: 1000;
+      display: flex; align-items: center; justify-content: space-between;
+      width: min(100%, 1600px); margin: auto; padding: 28px clamp(24px, 4.6vw, 76px);
+    }
+    .brand { display: inline-flex; align-items: center; gap: 12px; }
+    .brand-mark { width: 37px; height: 42px; color: var(--sea); }
+    .brand-word { font-family: "Instrument Serif", serif; font-size: 28px; letter-spacing: .07em; line-height: .85; }
+    .brand-sub { display: block; margin-top: 8px; color: var(--mist); font-size: 8px; font-weight: 500; letter-spacing: .34em; }
+    .main-nav { display: flex; align-items: center; gap: clamp(24px, 3vw, 48px); }
+    .main-nav a { position: relative; padding: 10px 0; color: #d7e3e1; font-size: 12px; letter-spacing: .08em; }
+    .main-nav a::after {
+      content: ""; position: absolute; left: 0; right: 100%; bottom: 3px; height: 1px;
+      background: var(--sea); transition: right .25s;
+    }
+    @media (hover: hover) { .main-nav a:hover::after { right: 0; } }
+    .header-edition { display: flex; align-items: center; gap: 10px; color: var(--mist); font-size: 10px; letter-spacing: .14em; }
+    .header-edition::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 5px rgba(255,145,102,.1); }
+
+    /* Hero */
+    .hero {
+      position: relative; isolation: isolate; min-height: 100svh; overflow: hidden;
+      display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(390px, .78fr); align-items: center;
+      gap: clamp(40px, 6vw, 100px); padding: 152px clamp(24px, 6.2vw, 100px) 92px;
+      background:
+        radial-gradient(circle at 68% 28%, rgba(34, 111, 116, .18), transparent 34%),
+        linear-gradient(120deg, var(--ink-deep), var(--ink) 55%, #0a2632);
+    }
+    .hero::before {
+      content: ""; position: absolute; inset: 0; z-index: -2; opacity: .38;
+      background-image: linear-gradient(rgba(124,227,195,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(124,227,195,.06) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: linear-gradient(to right, black, transparent 72%);
+    }
+    .hero::after {
+      content: "PORTUS"; position: absolute; left: -1.5vw; bottom: -4vw; z-index: -1;
+      color: transparent; -webkit-text-stroke: 1px rgba(155, 211, 207, .055);
+      font-family: "Instrument Serif", serif; font-size: 26vw; letter-spacing: -.04em; line-height: .7; pointer-events: none;
+    }
+    .hero-copy { position: relative; z-index: 2; max-width: 800px; }
+    .hero-title { margin: 0; font-family: "Noto Serif SC", serif; font-size: clamp(50px, 6.25vw, 102px); font-weight: 600; line-height: 1.14; letter-spacing: -.055em; }
+    .hero-title span { display: block; }
+    .hero-title .accent-line { color: var(--sea); }
+    .hero-english {
+      margin: 22px 0 0; color: var(--orange); font-family: "Instrument Serif", serif;
+      font-size: clamp(26px, 3vw, 47px); font-style: italic; line-height: 1; letter-spacing: -.02em;
+    }
+    .hero-intro { max-width: 570px; margin: 28px 0 0; color: #b9cbcd; font-size: 15px; line-height: 1.95; letter-spacing: .025em; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+    .hero-search {
+      display: flex; align-items: center; max-width: 570px; margin-top: 40px; padding: 7px 7px 7px 18px;
+      border: 1px solid rgba(158, 204, 204, .22); background: rgba(2, 18, 26, .45); backdrop-filter: blur(12px);
+    }
+    .hero-search svg { flex: 0 0 auto; width: 18px; color: var(--sea); }
+    .hero-search input {
+      min-width: 0; flex: 1; height: 44px; padding: 0 14px; color: var(--paper);
+      border: 0; outline: 0; background: transparent; font-size: 13px;
+    }
+    .hero-search input::placeholder { color: #779198; }
+    .hero-search button { min-height: 42px; padding: 0 18px; border: 0; color: var(--ink); background: var(--paper); cursor: pointer; font-size: 12px; font-weight: 600; }
+    .hero-note { display: flex; align-items: center; gap: 10px; margin: 15px 0 0; color: #78959b; font-size: 10px; letter-spacing: .08em; }
+    .hero-note::before { content: ""; width: 4px; height: 4px; background: var(--sea); border-radius: 50%; }
+
+    .hero-visual { position: relative; justify-self: end; width: min(100%, 590px); padding: 0 0 42px 32px; }
+    .hero-photo {
+      position: relative; height: min(65vh, 650px); min-height: 480px; overflow: hidden;
+      border-radius: 240px 240px 4px 4px; box-shadow: var(--shadow); background: #173743;
+    }
+    .hero-photo::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(3,20,28,.86), transparent 52%), linear-gradient(120deg, rgba(7,29,40,.12), rgba(7,29,40,.3));
+    }
+    .hero-photo img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.72) contrast(1.05) brightness(.78); }
+    .photo-label { position: absolute; z-index: 2; left: 34px; right: 34px; bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .photo-label strong { display: block; font-family: "Instrument Serif", serif; font-size: 25px; font-weight: 400; letter-spacing: .04em; }
+    .photo-label small { display: block; margin-top: 6px; color: #aac0c2; font-size: 9px; letter-spacing: .15em; }
+    .photo-index { color: var(--sea); font-family: "Instrument Serif", serif; font-size: 42px; font-style: italic; }
+    .hero-coordinate {
+      position: absolute; left: -22px; bottom: 0; z-index: 3; width: 240px; padding: 20px 22px;
+      color: var(--ink); background: var(--sea); box-shadow: 0 20px 45px rgba(0,0,0,.2);
+    }
+    .coordinate-top { display: flex; align-items: center; justify-content: space-between; font-size: 9px; font-weight: 700; letter-spacing: .14em; }
+    .coordinate-top svg { width: 24px; height: 24px; }
+    .coordinate-value { margin-top: 18px; font-family: "Instrument Serif", serif; font-size: 25px; letter-spacing: .03em; }
+    .coordinate-sub { margin-top: 4px; font-size: 9px; letter-spacing: .12em; opacity: .65; }
+    .compass {
+      position: absolute; top: 2%; right: -42px; z-index: 4; width: 104px; height: 104px;
+      display: grid; place-items: center; border-radius: 50%; color: var(--paper); background: var(--ink-deep); box-shadow: 0 15px 40px rgba(0,0,0,.25);
+    }
+    .compass svg { width: 72px; height: 72px; animation: compass-in 1.4s .5s both; }
+    .hero-side-note { position: absolute; right: 19px; top: 50%; color: #66858b; font-size: 8px; letter-spacing: .28em; writing-mode: vertical-rl; transform: translateY(-50%); }
+    @keyframes compass-in { from { transform: rotate(-50deg); opacity: 0; } to { transform: rotate(0); opacity: 1; } }
+
+    .signal-strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #061923; }
+    .signal-inner { width: min(100%, 1500px); margin: auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+    .signal-item { position: relative; padding: 30px clamp(18px, 3vw, 48px); border-right: 1px solid var(--line); }
+    .signal-item:last-child { border: 0; }
+    .signal-value { font-family: "Instrument Serif", serif; font-size: 38px; line-height: 1; color: var(--paper); }
+    .signal-value sup { margin-left: 5px; color: var(--sea); font-family: var(--body); font-size: 9px; letter-spacing: .12em; vertical-align: top; }
+    .signal-label { margin-top: 9px; color: #7f9ba0; font-size: 10px; letter-spacing: .14em; }
+
+    /* Atlas */
+    .atlas-section { position: relative; padding: 120px clamp(20px, 4.7vw, 76px) 130px; background: #09232f; }
+    .atlas-section::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .4;
+      background: radial-gradient(circle at 10% 30%, rgba(45,132,127,.16), transparent 28%);
+    }
+    .section-wrap { position: relative; width: min(100%, 1450px); margin: auto; }
+    .section-heading { display: grid; grid-template-columns: 1fr minmax(260px, 430px); gap: 40px; align-items: end; margin-bottom: 50px; }
+    .section-heading h2 { margin: 0; font-family: "Noto Serif SC", serif; font-size: clamp(36px, 4vw, 61px); font-weight: 600; letter-spacing: -.04em; line-height: 1.25; }
+    .section-heading .heading-description { margin: 0 0 7px; color: #9db4b7; font-size: 13px; line-height: 1.9; }
+    .atlas-toolbar { display: flex; gap: 16px; align-items: center; margin-bottom: 18px; }
+    .atlas-search { position: relative; flex: 1; max-width: 520px; }
+    .atlas-search svg { position: absolute; left: 16px; top: 50%; width: 18px; transform: translateY(-50%); color: var(--sea); pointer-events: none; }
+    .atlas-search input {
+      width: 100%; height: 52px; padding: 0 80px 0 46px; color: var(--paper);
+      border: 1px solid rgba(171, 211, 211, .22); border-radius: 0; outline: none; background: rgba(3,19,27,.44); font-size: 13px;
+    }
+    .atlas-search input:focus { border-color: var(--sea); }
+    .atlas-search input::placeholder { color: #759198; }
+    .search-key { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); padding: 3px 7px; border: 1px solid var(--line); color: #78979c; font-size: 10px; }
+    .result-summary { margin-left: auto; color: #88a5a9; font-size: 11px; letter-spacing: .08em; }
+    .result-summary strong { color: var(--sea); font-family: "Instrument Serif", serif; font-size: 24px; font-weight: 400; vertical-align: -2px; }
+    .region-filters { display: flex; gap: 8px; margin-bottom: 22px; overflow-x: auto; scrollbar-width: none; }
+    .region-filters::-webkit-scrollbar { display: none; }
+    .region-button {
+      flex: 0 0 auto; padding: 9px 15px; border: 1px solid rgba(158, 198, 199, .18); border-radius: 100px;
+      color: #96afb3; background: transparent; font-size: 11px; cursor: pointer; transition: .2s;
+    }
+    .region-button[aria-pressed="true"] { color: var(--ink); border-color: var(--sea); background: var(--sea); font-weight: 600; }
+    @media (hover: hover) { .region-button:not([aria-pressed="true"]):hover { color: var(--paper); border-color: #6f9499; } }
+    .atlas-shell { display: grid; grid-template-columns: 330px minmax(0, 1fr); min-height: 620px; border: 1px solid rgba(155,199,200,.2); box-shadow: var(--shadow); }
+    .port-panel { display: flex; flex-direction: column; min-width: 0; max-height: 620px; background: #071d28; border-right: 1px solid var(--line); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px; border-bottom: 1px solid var(--line); }
+    .panel-head h3 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .12em; }
+    .panel-head span { color: #63848b; font-family: "Instrument Serif", serif; font-size: 15px; font-style: italic; }
+    .port-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2a535a transparent; }
+    .port-item {
+      position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+      width: 100%; padding: 18px 20px; text-align: left; border: 0; border-bottom: 1px solid rgba(176,211,211,.09);
+      background: transparent; cursor: pointer; transition: background .2s;
+    }
+    .port-item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--sea); transform: scaleY(0); transition: transform .2s; }
+    @media (hover: hover) { .port-item:hover { background: #0e303c; } .port-item:hover::before { transform: scaleY(1); } }
+    .port-number { color: #52747b; font-family: "Instrument Serif", serif; font-size: 14px; font-style: italic; }
+    .port-item-name { display: block; font-size: 13px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+    .port-item-meta { display: block; margin-top: 5px; color: #739299; font-size: 9px; line-height: 1.5; letter-spacing: .07em; overflow-wrap: anywhere; }
+    .port-item-code { color: var(--sea); font-size: 9px; letter-spacing: .09em; white-space: nowrap; }
+    .panel-foot { padding: 14px 22px; color: #5f8187; border-top: 1px solid var(--line); font-size: 9px; line-height: 1.6; letter-spacing: .08em; }
+    .list-limit { padding: 16px 22px 20px; color: #739299; border-bottom: 1px solid rgba(176,211,211,.09); font-size: 10px; line-height: 1.7; }
+    .empty-list { padding: 45px 24px; text-align: center; color: #78989d; font-size: 12px; line-height: 1.8; }
+    .map-wrap { position: relative; min-width: 0; min-height: 620px; overflow: hidden; background: #0a2833; }
+    #map { position: absolute; inset: 0; z-index: 1; background: #0a2833; }
+    .map-topline {
+      position: absolute; z-index: 500; left: 20px; right: 20px; top: 18px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none;
+    }
+    .map-badge { max-width: 70%; padding: 8px 11px; color: #a9c5c6; border: 1px solid rgba(180,217,216,.17); background: rgba(5,25,34,.84); backdrop-filter: blur(8px); font-size: 8px; line-height: 1.5; letter-spacing: .14em; overflow-wrap: anywhere; }
+    .map-reset { flex: 0 0 auto; padding: 8px 12px; color: var(--paper); border: 1px solid rgba(180,217,216,.24); background: rgba(5,25,34,.84); cursor: pointer; pointer-events: auto; font-size: 10px; white-space: nowrap; }
+    .map-legend { position: absolute; z-index: 500; left: 20px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 7px 16px; max-width: calc(100% - 90px); padding: 10px 12px; color: #9bb5b8; background: rgba(5,25,34,.85); font-size: 9px; line-height: 1.5; pointer-events: none; }
+    .map-legend span { display: flex; align-items: center; gap: 7px; }
+    .legend-dot { width: 7px; height: 7px; border: 1px solid var(--ink); border-radius: 50%; background: var(--sea); box-shadow: 0 0 0 3px rgba(124,227,195,.18); }
+    .map-fallback { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 40px; text-align: center; color: #a5bec1; background: radial-gradient(circle, #123b47, #071d28); }
+    .map-fallback strong { display: block; margin-bottom: 10px; color: var(--paper); font-family: "Noto Serif SC", serif; font-size: 24px; }
+    .leaflet-tile-pane { filter: saturate(.65) brightness(.72) hue-rotate(-5deg); }
+    .leaflet-container { font-family: var(--body); }
+    .leaflet-control-zoom { border: 0 !important; box-shadow: 0 6px 20px rgba(0,0,0,.2) !important; }
+    .leaflet-control-zoom a { color: var(--paper) !important; border-color: #284751 !important; background: #0a2632 !important; }
+    .leaflet-control-attribution { color: #68878c; background: rgba(5,24,32,.7) !important; font-size: 8px !important; }
+    .leaflet-control-attribution a { color: #87b9b2; }
+    .leaflet-tooltip { padding: 7px 10px; color: var(--ink); border: 0; border-radius: 0; background: var(--paper); box-shadow: none; font-size: 10px; font-weight: 600; }
+    .leaflet-tooltip-top::before { border-top-color: var(--paper); }
+    .port-marker { background: transparent !important; border: 0 !important; }
+    .marker-pin { position: relative; width: 24px; height: 24px; }
+    .marker-core { position: absolute; left: 7px; top: 7px; width: 10px; height: 10px; border: 2px solid #08232d; border-radius: 50%; background: var(--sea); box-shadow: 0 0 0 2px rgba(124,227,195,.75); transition: transform .2s; }
+    .marker-pulse { position: absolute; inset: 1px; border: 1px solid rgba(124,227,195,.5); border-radius: 50%; animation: marker-pulse 2.8s infinite; }
+    .marker-code { position: absolute; left: 27px; top: 5px; width: max-content; color: #c7dbd9; font-size: 8px; font-weight: 600; letter-spacing: .08em; text-shadow: 0 1px 4px #001018; }
+    .port-marker.is-active .marker-core { background: var(--orange); box-shadow: 0 0 0 3px rgba(255,145,102,.35); transform: scale(1.35); }
+    .port-marker.is-active .marker-pulse { border-color: var(--orange); }
+    .port-marker.is-active .marker-code { color: var(--orange); }
+    .port-cluster { border: 0; background: transparent; }
+    .port-cluster span {
+      display: grid; place-items: center; width: 42px; height: 42px; color: var(--sea); border: 1px solid rgba(124,227,195,.8); border-radius: 50%;
+      background: rgba(5,29,39,.94); box-shadow: 0 0 0 5px rgba(124,227,195,.12), 0 5px 20px rgba(0,8,14,.3);
+      font-family: "Instrument Serif", serif; font-size: 15px; line-height: 1; letter-spacing: -.02em;
+    }
+    .leaflet-cluster-anim .leaflet-marker-icon { transition: transform .25s ease-out, opacity .25s ease-in; }
+    .leaflet-cluster-spider-leg { stroke: #7ce3c3; stroke-opacity: .55; }
+    @keyframes marker-pulse { 0%, 35% { transform: scale(.65); opacity: 0; } 55% { opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+
+    /* Directory */
+    .directory { position: relative; padding: 125px clamp(20px, 5.6vw, 90px) 130px; color: var(--ink); background: var(--paper); }
+    .directory::before { content: ""; position: absolute; top: 0; right: 8%; width: 1px; height: 100%; background: rgba(7,29,40,.08); }
+    .directory .eyebrow { color: var(--sea-dark); }
+    .directory .section-heading { margin-bottom: 38px; }
+    .directory .section-heading .heading-description { color: #5e7377; }
+    .index-meta { display: flex; justify-content: space-between; gap: 20px; padding: 17px 0; border-top: 1px solid rgba(7,29,40,.22); color: #637579; font-size: 10px; letter-spacing: .09em; }
+    .index-meta span { min-width: 0; overflow-wrap: anywhere; }
+    .clear-filters { flex: 0 0 auto; padding: 0; color: var(--ink); border: 0; border-bottom: 1px solid currentColor; background: none; cursor: pointer; font-size: 10px; }
+    .directory-list { border-bottom: 1px solid rgba(7,29,40,.22); }
+    .directory-row {
+      display: grid; grid-template-columns: 60px minmax(180px, 1.2fr) minmax(90px, .45fr) minmax(110px, .65fr) minmax(130px, .75fr) minmax(150px, .8fr) 40px;
+      gap: 20px; align-items: center; width: 100%; min-height: 112px; padding: 20px 6px;
+      color: var(--ink); text-align: left; border: 0; border-top: 1px solid rgba(7,29,40,.13); background: transparent; cursor: pointer;
+      transition: background .25s, padding .25s;
+    }
+    .directory-row:first-child { border-top: 0; }
+    .directory-row > span { min-width: 0; }
+    @media (hover: hover) { .directory-row:hover { padding-left: 16px; padding-right: 16px; background: var(--paper-bright); } }
+    .directory-no { color: #8d9a98; font-family: "Instrument Serif", serif; font-size: 18px; font-style: italic; }
+    .directory-port-name { font-family: "Noto Serif SC", serif; font-size: 25px; font-weight: 600; line-height: 1.35; letter-spacing: -.03em; overflow-wrap: anywhere; }
+    .directory-port-en { display: block; margin-top: 5px; color: #788987; font-family: "Instrument Serif", serif; font-size: 15px; font-weight: 400; font-style: italic; line-height: 1.35; letter-spacing: .02em; overflow-wrap: anywhere; }
+    .directory-code { color: var(--sea-dark); font-size: 11px; font-weight: 700; line-height: 1.6; letter-spacing: .11em; overflow-wrap: anywhere; }
+    .directory-region, .directory-type { color: #526b70; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+    .directory-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .directory-tag { padding: 4px 8px; color: #52686a; border: 1px solid rgba(7,29,40,.15); border-radius: 30px; font-size: 9px; }
+    .row-arrow { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid rgba(7,29,40,.24); border-radius: 50%; transition: .25s; }
+    .row-arrow svg { width: 14px; }
+    @media (hover: hover) { .directory-row:hover .row-arrow { color: var(--paper); border-color: var(--ink); background: var(--ink); transform: rotate(-35deg); } }
+    .directory-empty { padding: 70px 20px; text-align: center; border-top: 1px solid rgba(7,29,40,.12); }
+    .directory-empty strong { display: block; font-family: "Noto Serif SC", serif; font-size: 25px; }
+    .directory-empty p { color: #65797c; font-size: 12px; }
+    .directory-pagination { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 26px; color: #637579; font-size: 11px; }
+    .directory-pagination > span { line-height: 1.7; text-align: center; }
+    .directory-pagination strong { color: var(--ink); font-family: "Instrument Serif", serif; font-size: 20px; font-weight: 400; }
+    .page-button { min-height: 42px; padding: 0 17px; color: var(--ink); border: 1px solid rgba(7,29,40,.24); background: transparent; cursor: pointer; font-size: 11px; transition: color .2s, background .2s, border-color .2s; }
+    .page-button:disabled { opacity: .35; cursor: not-allowed; }
+    @media (hover: hover) { .page-button:not(:disabled):hover { color: var(--paper); border-color: var(--ink); background: var(--ink); } }
+
+    /* About */
+    .manifesto { position: relative; overflow: hidden; padding: 120px clamp(24px, 6vw, 96px) 0; background: #061923; }
+    .manifesto-grid { width: min(100%, 1380px); margin: auto; display: grid; grid-template-columns: 1.1fr .7fr; gap: 10vw; align-items: center; }
+    .manifesto-quote { margin: 0; font-family: "Instrument Serif", "Noto Serif SC", serif; font-size: clamp(45px, 5.8vw, 88px); font-weight: 400; line-height: .98; letter-spacing: -.035em; }
+    .manifesto-quote em { color: var(--sea); font-weight: 400; }
+    .manifesto-quote .cn-quote { display: block; margin-top: 30px; font-family: "Noto Serif SC", serif; font-size: .38em; font-style: normal; line-height: 1.5; letter-spacing: .03em; }
+    .manifesto-copy p { margin: 0 0 20px; color: #9eb5b8; font-size: 13px; line-height: 2; }
+    .manifesto-note { margin-top: 30px !important; padding-top: 22px; border-top: 1px solid var(--line); color: #668990 !important; font-size: 10px !important; }
+    .image-band { position: relative; width: min(100%, 1500px); height: 450px; margin: 100px auto 0; overflow: hidden; }
+    .image-band img { width: 100%; height: 100%; object-fit: cover; object-position: center 52%; filter: saturate(.55) brightness(.62); }
+    .image-band::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(4,20,29,.72), transparent 65%); }
+    .image-caption { position: absolute; z-index: 2; left: clamp(24px, 5vw, 70px); bottom: 45px; }
+    .image-caption strong { display: block; font-family: "Instrument Serif", "Noto Serif SC", serif; font-size: clamp(30px, 3vw, 48px); font-weight: 400; }
+    .image-caption span { display: block; margin-top: 8px; color: #a4bec0; font-size: 9px; letter-spacing: .18em; }
+    .site-footer { display: flex; justify-content: space-between; align-items: center; gap: 30px; padding: 35px clamp(24px, 5vw, 80px); color: #64848a; border-top: 1px solid var(--line); background: #04141d; font-size: 9px; line-height: 1.8; letter-spacing: .08em; }
+    .footer-brand { color: var(--paper); font-family: "Instrument Serif", serif; font-size: 20px; letter-spacing: .08em; }
+    .footer-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 20px; }
+    @media (hover: hover) { .footer-links a:hover { color: var(--sea); } }
+
+    /* Drawer */
+    .drawer-scrim { position: fixed; inset: 0; z-index: 1990; background: rgba(1,12,18,.66); backdrop-filter: blur(5px); animation: fade-in .25s both; }
+    .port-drawer {
+      position: fixed; z-index: 2000; top: 0; right: 0; bottom: 0; width: min(92vw, 470px); overflow-y: auto;
+      color: var(--ink); background: var(--paper); box-shadow: -30px 0 90px rgba(0,0,0,.3); animation: drawer-in .35s cubic-bezier(.22,.8,.25,1) both;
+    }
+    @keyframes fade-in { from { opacity: 0; } }
+    @keyframes drawer-in { from { transform: translateX(100%); } }
+    .drawer-top { display: flex; align-items: center; justify-content: space-between; padding: 24px 28px; border-bottom: 1px solid rgba(7,29,40,.15); }
+    .drawer-brand { font-family: "Instrument Serif", serif; font-size: 18px; letter-spacing: .09em; }
+    .drawer-close { display: grid; place-items: center; width: 38px; height: 38px; color: var(--ink); border: 1px solid rgba(7,29,40,.25); border-radius: 50%; background: transparent; cursor: pointer; }
+    .drawer-close svg { width: 16px; }
+    .drawer-body { padding: 38px 32px 30px; }
+    .drawer-eyebrow { display: flex; justify-content: space-between; gap: 14px; color: var(--sea-dark); font-size: 9px; font-weight: 700; line-height: 1.6; letter-spacing: .12em; }
+    .drawer-title { margin: 22px 0 0; font-family: "Noto Serif SC", serif; font-size: 43px; line-height: 1.2; letter-spacing: -.04em; overflow-wrap: anywhere; }
+    .drawer-en { margin: 7px 0 0; color: #6f8281; font-family: "Instrument Serif", serif; font-size: 26px; font-style: italic; line-height: 1.25; overflow-wrap: anywhere; }
+    .drawer-description { margin: 28px 0 0; color: #455f63; font-size: 13px; line-height: 1.95; }
+    .drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 30px; }
+    .drawer-actions .button { min-height: 46px; padding: 0 12px; font-size: 11px; }
+    .drawer-actions .button-ghost { color: var(--ink); border-color: rgba(7,29,40,.25); }
+    .drawer-actions .button-primary { color: var(--paper); background: var(--ink); }
+    .drawer-facts { display: grid; grid-template-columns: 1fr 1fr; margin: 34px 0 0; border-top: 1px solid rgba(7,29,40,.16); border-left: 1px solid rgba(7,29,40,.16); }
+    .drawer-fact { min-width: 0; padding: 18px; border-right: 1px solid rgba(7,29,40,.16); border-bottom: 1px solid rgba(7,29,40,.16); }
+    .drawer-fact dt { color: #738582; font-size: 9px; letter-spacing: .1em; }
+    .drawer-fact dd { margin: 9px 0 0; font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+    .drawer-subtitle { margin: 32px 0 13px; font-size: 10px; font-weight: 600; letter-spacing: .12em; }
+    .drawer-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .drawer-tag { padding: 7px 12px; color: #395e5b; border: 1px solid rgba(26,141,121,.3); border-radius: 40px; background: rgba(124,227,195,.12); font-size: 10px; }
+    .drawer-coordinate { margin-top: 32px; padding: 22px; color: var(--paper); background: var(--ink); }
+    .drawer-coordinate small { display: block; color: #83a2a6; font-size: 8px; letter-spacing: .14em; }
+    .drawer-coordinate strong { display: block; margin-top: 9px; color: var(--sea); font-family: "Instrument Serif", serif; font-size: 26px; font-weight: 400; letter-spacing: .05em; }
+    .drawer-foot { padding: 18px 32px 26px; color: #81918d; font-size: 9px; line-height: 1.7; }
+    .toast { position: fixed; z-index: 4000; left: 50%; bottom: 28px; transform: translateX(-50%); padding: 12px 20px; color: var(--ink); background: var(--sea); box-shadow: 0 10px 35px rgba(0,0,0,.25); font-size: 12px; animation: fade-in .2s both; }
+
+    /* Entrances */
+    .hero-copy > * { animation: rise-in .8s both; }
+    .hero-copy > :nth-child(2) { animation-delay: .08s; }
+    .hero-copy > :nth-child(3) { animation-delay: .15s; }
+    .hero-copy > :nth-child(4) { animation-delay: .22s; }
+    .hero-copy > :nth-child(5) { animation-delay: .29s; }
+    .hero-copy > :nth-child(6) { animation-delay: .36s; }
+    .hero-copy > :nth-child(7) { animation-delay: .42s; }
+    .hero-visual { animation: visual-in 1s .2s both; }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(22px); } }
+    @keyframes visual-in { from { opacity: 0; transform: translateX(30px); } }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .75s, transform .75s; }
+    .reveal.is-visible { opacity: 1; transform: none; }
+
+    @media (max-width: 1150px) {
+      .hero { grid-template-columns: minmax(0, 1fr) minmax(340px, .72fr); gap: 40px; }
+      .hero-title { font-size: clamp(48px, 6vw, 75px); }
+      .hero-side-note { display: none; }
+      .directory-row { grid-template-columns: 45px minmax(180px, 1.2fr) 100px minmax(120px, .7fr) 40px; }
+      .directory-type { display: none; }
+      .directory-tags { display: none; }
+    }
+    @media (max-width: 900px) {
+      .main-nav { display: none; }
+      .hero { min-height: auto; grid-template-columns: 1fr; padding-top: 140px; }
+      .hero-copy { max-width: 720px; }
+      .hero-title { font-size: clamp(54px, 10vw, 82px); }
+      .hero-visual { justify-self: center; width: min(88%, 580px); margin-top: 20px; }
+      .hero-photo { height: 620px; }
+      .hero-coordinate { left: 4px; }
+      .compass { right: -28px; }
+      .section-heading { grid-template-columns: 1fr; gap: 20px; }
+      .section-heading .heading-description { max-width: 560px; }
+      .atlas-shell { grid-template-columns: 1fr; }
+      .map-wrap { order: 1; min-height: 570px; }
+      .port-panel { order: 2; max-height: 410px; border-top: 1px solid var(--line); border-right: 0; }
+      .manifesto-grid { grid-template-columns: 1fr; gap: 55px; }
+      .manifesto-copy { max-width: 620px; }
+      .image-band { height: 390px; margin-top: 75px; }
+    }
+    @media (max-width: 640px) {
+      .site-header { padding: 22px 20px; }
+      .brand-word { font-size: 25px; }
+      .brand-sub { font-size: 7px; }
+      .brand-mark { width: 31px; }
+      .header-edition { font-size: 8px; }
+      .hero { gap: 24px; padding: 126px 20px 70px; }
+      .hero::before { background-size: 52px 52px; }
+      .hero-title { font-size: clamp(43px, 13.2vw, 64px); line-height: 1.2; }
+      .hero-english { margin-top: 18px; font-size: 30px; }
+      .hero-intro { margin-top: 22px; font-size: 13px; }
+      .hero-actions { margin-top: 28px; }
+      .hero-actions .button { flex: 1; min-width: 150px; padding: 0 14px; }
+      .hero-search { margin-top: 30px; padding-left: 13px; }
+      .hero-search input { padding: 0 10px; font-size: 11px; }
+      .hero-search button { padding: 0 12px; }
+      .hero-visual { width: calc(100% - 12px); padding-left: 12px; margin-top: 24px; }
+      .hero-photo { height: 470px; min-height: 0; border-radius: 180px 180px 3px 3px; }
+      .photo-label { left: 24px; right: 24px; bottom: 26px; }
+      .photo-label strong { font-size: 21px; }
+      .hero-coordinate { left: -6px; width: 210px; padding: 17px 19px; }
+      .coordinate-value { font-size: 22px; }
+      .compass { right: -13px; width: 82px; height: 82px; }
+      .compass svg { width: 58px; }
+      .signal-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .signal-item { min-width: 0; padding: 24px 20px; border-bottom: 1px solid var(--line); }
+      .signal-item:nth-child(2) { border-right: 0; }
+      .signal-item:nth-child(3), .signal-item:nth-child(4) { border-bottom: 0; }
+      .signal-value { font-size: 32px; }
+      .atlas-section { padding: 85px 14px 90px; }
+      .section-heading { padding: 0 7px; margin-bottom: 32px; }
+      .section-heading h2 { font-size: 38px; }
+      .atlas-toolbar { align-items: flex-end; flex-direction: column; gap: 12px; }
+      .atlas-search { width: 100%; max-width: none; }
+      .result-summary { margin-left: 0; align-self: flex-start; padding-left: 4px; }
+      .region-filters { padding-bottom: 4px; }
+      .map-wrap { min-height: 490px; }
+      .map-topline { left: 12px; right: 12px; top: 12px; gap: 8px; }
+      .map-badge { max-width: 58%; padding: 7px 8px; font-size: 7px; letter-spacing: .08em; }
+      .map-reset { padding: 8px 9px; font-size: 9px; }
+      .map-legend { left: 12px; bottom: 14px; max-width: calc(100% - 70px); padding: 8px 10px; gap: 5px 12px; font-size: 8px; }
+      .marker-code { display: none; }
+      .port-panel { max-height: 390px; }
+      .directory { padding: 85px 20px 90px; }
+      .directory-row { grid-template-columns: 30px minmax(0, 1fr) 34px; gap: 12px; min-height: 96px; padding: 17px 0; }
+      .directory-code, .directory-region { display: none; }
+      .directory-no { font-size: 13px; }
+      .directory-port-name { font-size: 22px; }
+      .directory-port-en { font-size: 14px; }
+      .index-meta { align-items: flex-start; }
+      .index-meta span { max-width: 68%; line-height: 1.6; }
+      .directory-pagination { gap: 10px; }
+      .page-button { padding: 0 10px; font-size: 10px; }
+      .manifesto { padding: 85px 22px 0; }
+      .manifesto-quote { font-size: 51px; }
+      .manifesto-quote .cn-quote { font-size: 21px; }
+      .image-band { height: 350px; margin-top: 60px; }
+      .image-band img { object-position: 62% center; }
+      .image-caption { left: 24px; bottom: 30px; }
+      .site-footer { align-items: flex-start; flex-direction: column; gap: 16px; padding: 28px 22px; }
+      .footer-links { flex-wrap: wrap; gap: 12px 20px; }
+      .drawer-body { padding: 30px 24px 24px; }
+      .drawer-title { font-size: 38px; }
+      .drawer-top { padding: 20px 24px; }
+      .drawer-foot { padding-left: 24px; }
+    }
+    @media (max-width: 360px) {
+      .signal-value sup { display: block; margin: 7px 0 0; }
+      .drawer-actions { grid-template-columns: 1fr; }
+      .drawer-coordinate { padding: 18px; }
+      .drawer-coordinate strong { font-size: 23px; overflow-wrap: anywhere; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳至主要内容</a>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="PORTUS 全球港口图志首页">
+      <svg class="brand-mark" viewBox="0 0 40 46" fill="none" aria-hidden="true">
+        <circle cx="20" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M20 11v28M10 18h20M6 32c2 7 7 10 14 10s12-3 14-10M3 32h9m16 0h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M15 13h10" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <span><span class="brand-word">PORTUS</span><span class="brand-sub">全球港口图志</span></span>
+    </a>
+    <nav class="main-nav" aria-label="主导航">
+      <a href="#atlas">探索地图</a>
+      <a href="#directory">港口索引</a>
+      <a href="#about">关于图志</a>
+    </nav>
+    <div class="header-edition">EXPLORER EDITION · 2026</div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow">A living atlas of global seaports</p>
+        <h1 class="hero-title"><span>港口，</span><span class="accent-line">是世界的心跳。</span></h1>
+        <p class="hero-english">Where the world comes ashore.</p>
+        <p class="hero-intro">从新加坡的转运枢纽，到鹿特丹的欧洲门户。以一张交互海图，阅读全球 3,802 座真实港口的位置、港型与公开设施记录，让遥远的海岸线变得触手可及。</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#atlas">探索世界港口
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="button button-ghost" href="#directory">浏览港口索引</a>
+        </div>
+        <form class="hero-search" id="heroSearchForm" role="search">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <label class="sr-only" for="heroSearch">搜索港口</label>
+          <input id="heroSearch" type="search" autocomplete="off" placeholder="试试搜索：上海 / CNSHA / Rotterdam">
+          <button type="submit">在海图中查找</button>
+        </form>
+        <p class="hero-note">真实收录 3,802 座港口 · 覆盖 193 个国家与地区 · 2025 年 4 月版</p>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-photo">
+          <img src="assets/port-hero.jpg" alt="密集的集装箱码头、岸桥与港湾航拍" fetchpriority="high">
+          <div class="photo-label">
+            <div><strong>Gateways of commerce</strong><small>全球贸易的岸线与门户</small></div>
+            <span class="photo-index">01</span>
+          </div>
+        </div>
+        <div class="hero-coordinate" aria-hidden="true">
+          <div class="coordinate-top"><span>YOUR NEXT DISCOVERY</span>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 17c3-6 6-8 10-8 2.5 0 4 1 6 3M5 5l2 2m12 10 2 2M9 19c3-3 6-4 11-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="coordinate-value">01°15′N · 103°50′E</div>
+          <div class="coordinate-sub">SINGAPORE / STRAIT OF MALACCA</div>
+        </div>
+        <div class="compass" aria-hidden="true">
+          <svg viewBox="0 0 100 100" fill="none">
+            <circle cx="50" cy="50" r="43" stroke="currentColor" stroke-opacity=".25"/>
+            <circle cx="50" cy="50" r="32" stroke="currentColor" stroke-opacity=".16" stroke-dasharray="1 5"/>
+            <path d="m50 13 7 30 30 7-30 7-7 30-7-30-30-7 30-7 7-30Z" stroke="currentColor" stroke-opacity=".65"/>
+            <path d="m50 13 7 30-7 7-7-7 7-30Z" fill="#7ce3c3"/>
+            <circle cx="50" cy="50" r="3" fill="#ff9166"/>
+            <text x="50" y="9" text-anchor="middle" fill="currentColor" font-size="7" font-family="DM Sans">N</text>
+          </svg>
+        </div>
+      </div>
+      <span class="hero-side-note" aria-hidden="true">LATITUDE · LONGITUDE · DISCOVERY</span>
+    </section>
+
+    <section class="signal-strip" aria-label="图志概览">
+      <div class="signal-inner">
+        <div class="signal-item"><div class="signal-value">3,802<sup>PORTS</sup></div><div class="signal-label">真实港口档案</div></div>
+        <div class="signal-item"><div class="signal-value">193<sup>COUNTRIES</sup></div><div class="signal-label">国家与地区</div></div>
+        <div class="signal-item"><div class="signal-value">08<sup>REGIONS</sup></div><div class="signal-label">全球地理分区</div></div>
+        <div class="signal-item"><div class="signal-value">2025.04<sup>SNAPSHOT</sup></div><div class="signal-label">公开静态数据版本</div></div>
+      </div>
+    </section>
+
+    <section class="atlas-section" id="atlas">
+      <div class="section-wrap">
+        <div class="section-heading reveal">
+          <div><p class="eyebrow">01 / The interactive atlas</p><h2>一张地图，抵达世界。</h2></div>
+          <p class="heading-description">缩放海图，或按区域与关键词筛选。密集港口会自动聚合；点击标记或列表条目，即可查看对应的真实档案。</p>
+        </div>
+        <div class="atlas-toolbar reveal">
+          <div class="atlas-search">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <label class="sr-only" for="portSearch">按名称、国家、UN/LOCODE 或 WPI 编号搜索港口</label>
+            <input id="portSearch" type="search" autocomplete="off" placeholder="搜索港口、国家、UN/LOCODE 或 WPI 编号…">
+            <span class="search-key" aria-hidden="true">/</span>
+          </div>
+          <div class="result-summary" aria-live="polite">当前显示 <strong id="resultCount">3,802</strong> 座港口</div>
+        </div>
+        <div class="region-filters reveal" id="regionFilters" aria-label="按区域筛选">
+          <button class="region-button" data-region="全部" aria-pressed="true">全部区域</button>
+          <button class="region-button" data-region="亚洲" aria-pressed="false">亚洲</button>
+          <button class="region-button" data-region="欧洲" aria-pressed="false">欧洲</button>
+          <button class="region-button" data-region="中东" aria-pressed="false">中东</button>
+          <button class="region-button" data-region="北美洲" aria-pressed="false">北美洲</button>
+          <button class="region-button" data-region="南美洲" aria-pressed="false">南美洲</button>
+          <button class="region-button" data-region="非洲" aria-pressed="false">非洲</button>
+          <button class="region-button" data-region="大洋洲" aria-pressed="false">大洋洲</button>
+          <button class="region-button" data-region="南极洲" aria-pressed="false">南极洲</button>
+        </div>
+        <div class="atlas-shell reveal">
+          <aside class="port-panel" aria-label="筛选后的港口列表">
+            <div class="panel-head"><h3>港口列表</h3><span>Port directory</span></div>
+            <div class="port-list" id="portList"></div>
+            <div class="panel-foot">海图显示全部结果 · 列表前 60 条</div>
+          </aside>
+          <div class="map-wrap">
+            <div id="map" role="application" aria-label="全球港口交互地图"></div>
+            <div class="map-topline"><span class="map-badge">ATLAS VIEW / NGA PUB.150 · 2025.04</span><button class="map-reset" id="resetMap" type="button">↺ 重置世界视图</button></div>
+            <div class="map-legend"><span><i class="legend-dot"></i>真实港口</span><span>NGA Pub.150 · Natural Earth</span></div>
+            <div class="map-fallback" id="mapFallback" hidden><div><strong>海图暂时未能载入</strong><span>你仍可通过港口列表与索引探索全部真实数据。<br>联网后刷新页面即可恢复交互地图。</span></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="directory" id="directory">
+      <div class="section-wrap">
+        <div class="section-heading reveal">
+          <div><p class="eyebrow">02 / Port index</p><h2>每一座港口，<br>都有真实档案。</h2></div>
+          <p class="heading-description">从 UN/LOCODE 与 WPI 编号，到港型、水深和设施记录。每页展示 24 条档案，搜索与区域筛选始终作用于全部数据。</p>
+        </div>
+        <div class="index-meta reveal"><span id="indexStatus">全部区域 · 3,802 条港口档案</span><button class="clear-filters" id="clearFilters" type="button">清除筛选 ↗</button></div>
+        <div class="directory-list reveal" id="directoryList"></div>
+        <nav class="directory-pagination" id="directoryPagination" aria-label="港口索引分页" hidden></nav>
+      </div>
+    </section>
+
+    <section class="manifesto" id="about">
+      <div class="manifesto-grid">
+        <div class="reveal">
+          <p class="eyebrow">03 / Our perspective</p>
+          <h2 class="manifesto-quote">The sea connects <em>what distance separates.</em><span class="cn-quote">海有距离，港无边界。</span></h2>
+        </div>
+        <div class="manifesto-copy reveal">
+          <p>全球约八成的货物贸易量通过海运完成。每一座港口，都是观察世界经济的一扇窗：货物在此集散，文化在此相遇，城市因航线而生长。</p>
+          <p>PORTUS 将 NGA World Port Index 的 2025 年 4 月版公开资料整理为可搜索的世界图志，收录 3,802 座港口。位置、港型、水深与设施字段来自该版本；中文别名、地理分区和设施标签为便于浏览而补充或归纳。</p>
+          <p class="manifesto-note">这是公开基础资料的静态快照，不展示实时船位、到港船舶、拥堵或动态吞吐量。“未记录”不代表没有；参考坐标与港口参数不用于航海、靠泊、调度或船舶安全决策。港口与陆地数据随网站本地打包，交互地图组件和在线字体需要联网加载。</p>
+        </div>
+      </div>
+      <div class="image-band reveal">
+        <img src="assets/port-terminal.jpg" alt="停靠在码头的大型集装箱船与岸边起重机" loading="lazy">
+        <div class="image-caption"><strong>Every port opens a new horizon.</strong><span>每一座港口，都通向新的地平线</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div><span class="footer-brand">PORTUS</span> · 全球港口图志</div>
+    <div class="footer-links"><a href="assets/data-notice.txt" target="_blank" rel="noreferrer">数据说明 / NGA · CC BY 4.0</a><a href="https://github.com/aashishvanand/seaport-data-js" target="_blank" rel="noreferrer">汇编 / seaport-data-js</a><a href="https://unsplash.com" target="_blank" rel="noreferrer">影像 / Unsplash</a><a href="#atlas">返回海图 ↑</a><span>© 2026 PORTUS</span></div>
+  </footer>
+
+  <div class="drawer-scrim" id="drawerScrim" hidden></div>
+  <aside class="port-drawer" id="portDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+    <div class="drawer-top"><span class="drawer-brand">PORTUS / PORT PROFILE</span><button class="drawer-close" id="drawerClose" type="button" aria-label="关闭港口档案"><svg viewBox="0 0 24 24" fill="none"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>
+    <div id="drawerContent"></div>
+    <div class="drawer-foot">NGA World Port Index · 2025 年 4 月静态快照<br>“未记录”不代表没有；不用于航海、靠泊或实时业务决策。</div>
+  </aside>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <noscript><div style="position:fixed;inset:auto 0 0;padding:16px;background:#ff9166;color:#071d28;text-align:center;z-index:5000">请启用 JavaScript，以使用港口搜索、筛选和交互地图。</div></noscript>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="assets/leaflet.markercluster.js"></script>
+  <script src="assets/world-land.js"></script>
+  <script src="assets/ports-data.js"></script>
+  <script>
+    const ports = Array.isArray(window.PORTUS_PORTS) ? window.PORTUS_PORTS : [];
+    const dataMeta = window.PORTUS_DATA_META || { recordCount: ports.length, countryCount: 0, edition: "2025-04" };
+    const state = { query: "", region: "全部", selected: null, page: 1 };
+    const PAGE_SIZE = 24;
+    const SIDEBAR_SIZE = 60;
+    let map = null;
+    let markerLayer = null;
+    let markers = new Map();
+    const worldCopies = new Map();
+    let lastFocused = null;
+    let toastTimer = null;
+    let searchTimer = null;
+    let fitTimer = null;
+    let locateTimer = null;
+    let revealTimer = null;
+    let revealRequestId = 0;
+    let revealedMarker = null;
+
+    const countryDisplay = typeof Intl.DisplayNames === "function" ? new Intl.DisplayNames(["zh-CN"], { type: "region" }) : null;
+    const numberDisplay = new Intl.NumberFormat("zh-CN");
+    const sizeLabels = { "Large": "大型", "Medium": "中型", "Small": "小型", "Very Small": "很小型" };
+    const typeLabels = {
+      "Coastal (Natural)": "海岸天然港", "Coastal (Breakwater)": "海岸防波堤港", "Coastal (Tide Gates)": "海岸闸门港",
+      "Open Roadstead": "开放锚地港", "River (Natural)": "天然河道港", "River (Basins)": "河道港池港",
+      "River (Tide Gates)": "河道潮汐闸门港", "Canal or Lake": "运河或湖泊港", "Typhoon Harbor": "防台风港"
+    };
+    const useLabels = { "Cargo": "货运", "Fishing": "渔业", "Ferry": "渡运", "Military": "军用" };
+    const shelterLabels = { "Excellent": "优良", "Good": "良好", "Fair": "一般", "Poor": "较差", "None": "无遮蔽" };
+
+    function displayName(port) { return port.nameZh || port.name; }
+    function displayCountry(port) {
+      if (!countryDisplay) return port.country;
+      try { return countryDisplay.of(port.countryCode) || port.country; }
+      catch (error) { return port.country; }
+    }
+    function normalizeSearch(value) { return String(value || "").toLocaleLowerCase().replace(/[\s\-_/().,·]+/g, ""); }
+    function escapeHTML(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+    }
+    function formatCount(value) { return numberDisplay.format(value); }
+    function formatDepth(value) { return typeof value === "number" ? `${value} m` : "未记录"; }
+    function reducedMotion() { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
+
+    ports.forEach((port) => {
+      port.displayName = displayName(port);
+      port.countryZh = displayCountry(port);
+      port.searchText = normalizeSearch([
+        port.displayName, port.name, port.alt, port.code, port.locode, `WPI ${port.wpi}`, port.wpi,
+        port.country, port.countryZh, port.countryCode, port.region, port.sourceRegion, port.water,
+        port.size, sizeLabels[port.size], port.type, typeLabels[port.type], port.use, useLabels[port.use],
+        ...port.aliases, ...port.tags
+      ].filter(Boolean).join(" "));
+    });
+
+    const $ = (selector) => document.querySelector(selector);
+    const portList = $("#portList");
+    const directoryList = $("#directoryList");
+    const portSearch = $("#portSearch");
+    const drawer = $("#portDrawer");
+    const drawerScrim = $("#drawerScrim");
+    const drawerContent = $("#drawerContent");
+    const arrowIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function filteredPorts() {
+      const query = normalizeSearch(state.query);
+      return ports.filter((port) => {
+        const regionMatch = state.region === "全部" || port.region === state.region;
+        return regionMatch && (!query || port.searchText.includes(query));
+      });
+    }
+
+    function render(updateMap = true) {
+      const results = filteredPorts();
+      const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
+      if (state.page > totalPages) state.page = totalPages;
+      const pageStart = (state.page - 1) * PAGE_SIZE;
+      const pageResults = results.slice(pageStart, pageStart + PAGE_SIZE);
+      const sidebarResults = results.slice(0, SIDEBAR_SIZE);
+      $("#resultCount").textContent = formatCount(results.length);
+      $("#indexStatus").textContent = `${state.region === "全部" ? "全部区域" : state.region}${state.query ? ` · “${state.query}”` : ""} · ${formatCount(results.length)} 条港口档案${results.length > PAGE_SIZE ? ` · 第 ${state.page} / ${totalPages} 页` : ""}`;
+      $(".panel-foot").textContent = results.length > SIDEBAR_SIZE ? `海图显示全部结果 · 列表前 ${SIDEBAR_SIZE} 条` : "点击条目 · 展开港口档案";
+
+      portList.innerHTML = sidebarResults.length ? sidebarResults.map((port, index) => `
+        <button class="port-item" type="button" data-port="${port.id}" aria-label="查看${escapeHTML(port.displayName)}档案">
+          <span class="port-number">${String(index + 1).padStart(2, "0")}</span>
+          <span><span class="port-item-name">${escapeHTML(port.displayName)}</span><span class="port-item-meta">${escapeHTML(port.countryZh)} · ${port.region}</span></span>
+          <span class="port-item-code">${escapeHTML(port.code)}</span>
+        </button>`).join("") + (results.length > SIDEBAR_SIZE ? '<div class="list-limit">继续搜索可缩小范围，海图仍显示全部匹配港口。</div>' : "") : '<div class="empty-list">没有找到匹配的港口。<br>试试其他关键词或切换区域。</div>';
+
+      directoryList.innerHTML = pageResults.length ? pageResults.map((port, index) => {
+        const tags = port.tags.length ? port.tags : [sizeLabels[port.size], useLabels[port.use]].filter(Boolean);
+        return `<button class="directory-row" type="button" data-port="${port.id}" aria-label="打开${escapeHTML(port.displayName)}详情">
+          <span class="directory-no">${String(pageStart + index + 1).padStart(2, "0")}</span>
+          <span class="directory-port-name">${escapeHTML(port.displayName)}<span class="directory-port-en">${escapeHTML(port.name)}</span></span>
+          <span class="directory-code">${escapeHTML(port.code)}</span>
+          <span class="directory-region">${escapeHTML(port.countryZh)}<br>${port.region}</span>
+          <span class="directory-type">${escapeHTML(typeLabels[port.type] || sizeLabels[port.size] || "港型未记录")}</span>
+          <span class="directory-tags">${tags.slice(0, 2).map((tag) => `<span class="directory-tag">${escapeHTML(tag)}</span>`).join("")}</span>
+          <span class="row-arrow">${arrowIcon}</span>
+        </button>`;
+      }).join("") : '<div class="directory-empty"><strong>这片海域暂时没有结果</strong><p>请更换搜索词，或清除区域筛选后再试。</p></div>';
+
+      const pagination = $("#directoryPagination");
+      pagination.hidden = results.length <= PAGE_SIZE;
+      pagination.innerHTML = results.length <= PAGE_SIZE ? "" : `
+        <button class="page-button" type="button" data-page="${state.page - 1}" ${state.page === 1 ? "disabled" : ""}>← 上一页</button>
+        <span>第 <strong>${state.page}</strong> / ${formatCount(totalPages)} 页</span>
+        <button class="page-button" type="button" data-page="${state.page + 1}" ${state.page === totalPages ? "disabled" : ""}>下一页 →</button>`;
+
+      document.querySelectorAll("[data-port]").forEach((button) => button.addEventListener("click", () => openPort(button.dataset.port)));
+      if (updateMap) updateMarkers(results);
+      if (state.selected && !results.some((port) => port.id === state.selected)) closeDrawer();
+    }
+
+    function createWorldLayer(offset = 0) {
+      const layer = L.geoJSON(window.WORLD_LAND_DATA, {
+        interactive: false,
+        coordsToLatLng: (coords) => L.latLng(coords[1], coords[0] + offset),
+        style: { className: "world-land", color: "#35606a", weight: .65, fillColor: "#143b47", fillOpacity: 1, opacity: .9 }
+      });
+      layer.addTo(map).bringToBack();
+      worldCopies.set(offset, layer);
+      return layer;
+    }
+
+    function syncWorldCopies(offsets = [0]) {
+      const wanted = new Set([0, ...offsets]);
+      worldCopies.forEach((layer, offset) => {
+        if (!wanted.has(offset)) {
+          map.removeLayer(layer);
+          worldCopies.delete(offset);
+        }
+      });
+      wanted.forEach((offset) => { if (!worldCopies.has(offset)) createWorldLayer(offset); });
+      map.options.worldCopyJump = wanted.size === 1;
+    }
+
+    function restoreBaseWorld() {
+      if (!map) return;
+      ports.forEach((port) => {
+        const marker = markers.get(port.id);
+        if (!marker) return;
+        const position = marker.getLatLng();
+        if (position.lat !== port.lat || position.lng !== port.lng) marker.setLatLng([port.lat, port.lng]);
+      });
+      syncWorldCopies([0]);
+    }
+
+    function initMap() {
+      if (!window.L || typeof L.markerClusterGroup !== "function") {
+        $("#mapFallback").hidden = false;
+        return;
+      }
+      try {
+        map = L.map("map", { center: [24, 24], zoom: 2, minZoom: 2, maxZoom: 10, zoomControl: false, scrollWheelZoom: false, worldCopyJump: true, attributionControl: false });
+        L.control.zoom({ position: "bottomright" }).addTo(map);
+        for (let lat = -60; lat <= 60; lat += 30) {
+          L.polyline([[lat, -180], [lat, 180]], { color: "#77a9aa", weight: .5, opacity: .14, interactive: false }).addTo(map);
+        }
+        for (let lng = -150; lng <= 180; lng += 30) {
+          L.polyline([[-85, lng], [85, lng]], { color: "#77a9aa", weight: .5, opacity: .14, interactive: false }).addTo(map);
+        }
+        if (!window.WORLD_LAND_DATA) throw new Error("World map data unavailable");
+        createWorldLayer(0);
+        markerLayer = L.markerClusterGroup({
+          showCoverageOnHover: false,
+          maxClusterRadius: 48,
+          disableClusteringAtZoom: 7,
+          chunkedLoading: false,
+          iconCreateFunction: (cluster) => L.divIcon({
+            className: "port-cluster",
+            html: `<span>${formatCount(cluster.getChildCount())}</span>`,
+            iconSize: [42, 42],
+            iconAnchor: [21, 21]
+          })
+        }).addTo(map);
+        ports.forEach((port) => {
+          const icon = L.divIcon({
+            className: `port-marker marker-${port.id}`,
+            html: `<span class="marker-pin"><span class="marker-pulse"></span><span class="marker-core"></span><span class="marker-code">${escapeHTML(port.code)}</span></span>`,
+            iconSize: [24, 24], iconAnchor: [12, 12]
+          });
+          const marker = L.marker([port.lat, port.lng], { icon, title: `${port.displayName} / ${port.code}`, keyboard: false, riseOnHover: true });
+          marker.bindTooltip(`${escapeHTML(port.displayName)} · ${escapeHTML(port.code)}`, { direction: "top", offset: [0, -10] });
+          marker.on("click", () => openPort(port.id));
+          markers.set(port.id, marker);
+        });
+        updateMarkers(filteredPorts());
+        setTimeout(() => map.invalidateSize(), 250);
+      } catch (error) {
+        console.error("Map initialization failed", error);
+        $("#mapFallback").hidden = false;
+      }
+    }
+
+    function updateActiveMarker() {
+      markers.forEach((marker, id) => {
+        const element = marker.getElement();
+        if (element) element.classList.toggle("is-active", state.selected === id);
+      });
+    }
+
+    function updateMarkers(results) {
+      if (!map || !markerLayer) return;
+      cancelPendingReveal();
+      map.setView(map.getCenter(), map.getZoom(), { animate: false });
+      markerLayer.clearLayers();
+      restoreBaseWorld();
+      markerLayer.addLayers(results.map((port) => markers.get(port.id)).filter(Boolean));
+      updateActiveMarker();
+    }
+
+    function openPort(id) {
+      const port = ports.find((item) => item.id === id);
+      if (!port) return;
+      lastFocused = document.activeElement;
+      state.selected = id;
+      const sourceFacts = [
+        `${port.displayName}位于${port.countryZh}${port.sourceRegion ? `，NGA 分区为 ${port.sourceRegion}` : ""}。`,
+        port.water ? `记录水域：${port.water}。` : "源数据未记录所在水域。",
+        "本档案依据 2025 年 4 月版 World Port Index 整理；水深与设施均为该版本的历史快照，“未记录”不代表没有。"
+      ].join("");
+      const alternate = port.alt && port.alt !== port.name ? ` · ${port.alt}` : "";
+      const tags = port.tags.length ? port.tags.map((tag) => `<span class="drawer-tag">${escapeHTML(tag)}</span>`).join("") : '<span class="drawer-tag">无肯定设施记录 · 不代表没有</span>';
+      drawerContent.innerHTML = `<div class="drawer-body">
+        <div class="drawer-eyebrow"><span>${port.region} / ${escapeHTML(port.countryZh)}</span><span>WPI ${port.wpi}</span></div>
+        <h2 class="drawer-title" id="drawerTitle">${escapeHTML(port.displayName)}</h2>
+        <p class="drawer-en">${escapeHTML(port.name + alternate)}</p>
+        <p class="drawer-description">${escapeHTML(sourceFacts)}</p>
+        <div class="drawer-actions">
+          <button class="button button-primary" id="locatePort" type="button">在海图中定位 ${arrowIcon}</button>
+          <button class="button button-ghost" id="copyCode" type="button">复制 ${escapeHTML(port.code)}</button>
+        </div>
+        <dl class="drawer-facts">
+          <div class="drawer-fact"><dt>UN / LOCODE</dt><dd>${escapeHTML(port.locode || "未记录")}</dd></div>
+          <div class="drawer-fact"><dt>WPI 编号</dt><dd>${port.wpi}</dd></div>
+          <div class="drawer-fact"><dt>港口规模</dt><dd>${escapeHTML(sizeLabels[port.size] || "未记录")}</dd></div>
+          <div class="drawer-fact"><dt>港口类型</dt><dd>${escapeHTML(typeLabels[port.type] || "未记录")}</dd></div>
+          <div class="drawer-fact"><dt>航道水深</dt><dd>${formatDepth(port.channelDepth)}</dd></div>
+          <div class="drawer-fact"><dt>锚地水深</dt><dd>${formatDepth(port.anchorageDepth)}</dd></div>
+          <div class="drawer-fact"><dt>货物码头水深</dt><dd>${formatDepth(port.cargoDepth)}</dd></div>
+          <div class="drawer-fact"><dt>最大船舶吃水</dt><dd>${formatDepth(port.maxDraft)}</dd></div>
+        </dl>
+        <h3 class="drawer-subtitle">源数据设施与服务标签</h3>
+        <div class="drawer-tags">${tags}</div>
+        <div class="drawer-coordinate"><small>WGS 84 REFERENCE / WGS84 参考坐标</small><strong>${formatCoordinate(port.lat, "N", "S")} · ${formatCoordinate(port.lng, "E", "W")}</strong></div>
+      </div>`;
+      drawer.hidden = false;
+      drawerScrim.hidden = false;
+      document.body.classList.add("drawer-open");
+      $("#drawerClose").focus();
+      $("#locatePort").addEventListener("click", () => locatePort(port));
+      $("#copyCode").addEventListener("click", () => copyPortCode(port.code));
+      updateActiveMarker();
+    }
+
+    function closeDrawer() {
+      if (drawer.hidden) return;
+      drawer.hidden = true;
+      drawerScrim.hidden = true;
+      document.body.classList.remove("drawer-open");
+      state.selected = null;
+      updateActiveMarker();
+      if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
+    }
+
+    function cancelPendingReveal() {
+      revealRequestId += 1;
+      if (fitTimer !== null) { clearTimeout(fitTimer); fitTimer = null; }
+      if (locateTimer !== null) { clearTimeout(locateTimer); locateTimer = null; }
+      if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
+      if (revealedMarker) { revealedMarker.closeTooltip(); revealedMarker = null; }
+      return revealRequestId;
+    }
+
+    function revealMarker(port) {
+      if (!map || !markerLayer) return;
+      const marker = markers.get(port.id);
+      if (!marker) return;
+      const requestId = cancelPendingReveal();
+      const position = marker.getLatLng();
+      if (reducedMotion()) map.setView(position, 7, { animate: false });
+      else map.flyTo(position, 7, { duration: 1.1 });
+      revealTimer = setTimeout(() => {
+        revealTimer = null;
+        if (requestId !== revealRequestId || !markerLayer.hasLayer(marker)) return;
+        if (!map.hasLayer(marker) || !map.getBounds().contains(marker.getLatLng())) return;
+        marker.openTooltip();
+        revealedMarker = marker;
+        updateActiveMarker();
+      }, reducedMotion() ? 60 : 1150);
+    }
+
+    function locatePort(port) {
+      const requestId = cancelPendingReveal();
+      closeDrawer();
+      $("#atlas").scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth" });
+      locateTimer = setTimeout(() => {
+        locateTimer = null;
+        if (requestId === revealRequestId) revealMarker(port);
+      }, reducedMotion() ? 20 : 350);
+    }
+
+    function formatCoordinate(value, positive, negative) {
+      return `${Math.abs(value).toFixed(3)}°${value >= 0 ? positive : negative}`;
+    }
+
+    async function copyPortCode(code) {
+      let input = null;
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(code);
+        else {
+          input = document.createElement("textarea");
+          input.value = code; input.style.position = "fixed"; input.style.opacity = "0";
+          document.body.appendChild(input); input.select();
+          if (!document.execCommand("copy")) throw new Error("Browser copy command was rejected");
+        }
+        showToast(`已复制港口代码 ${code}`);
+      } catch (error) { showToast(`港口代码：${code}`); }
+      finally { if (input) input.remove(); }
+    }
+
+    function showToast(message) {
+      const toast = $("#toast");
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.hidden = false;
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 2200);
+    }
+
+    function shortestLongitudeArc(results) {
+      const longitudes = results.map((port) => port.lng).sort((a, b) => a - b);
+      let largestGap = -1;
+      let largestGapIndex = 0;
+      longitudes.forEach((lng, index) => {
+        const next = index === longitudes.length - 1 ? longitudes[0] + 360 : longitudes[index + 1];
+        const gap = next - lng;
+        if (gap > largestGap) { largestGap = gap; largestGapIndex = index; }
+      });
+      const start = longitudes[(largestGapIndex + 1) % longitudes.length];
+      const span = 360 - largestGap;
+      const rawCenter = start + span / 2;
+      const center = ((rawCenter + 180) % 360 + 360) % 360 - 180;
+      return { center, span };
+    }
+
+    function fitResults(results) {
+      if (!map || !results.length) return;
+      cancelPendingReveal();
+      if (results.length === ports.length) { resetMapView(); return; }
+      if (results.length === 1) { revealMarker(results[0]); return; }
+      const arc = shortestLongitudeArc(results);
+      const adjusted = results.map((port) => {
+        const offset = 360 * Math.round((arc.center - port.lng) / 360);
+        return { port, lat: port.lat, lng: port.lng + offset, offset };
+      });
+      syncWorldCopies(adjusted.map((point) => point.offset));
+      adjusted.forEach((point) => {
+        const marker = markers.get(point.port.id);
+        if (marker) marker.setLatLng([point.lat, point.lng]);
+      });
+      const bounds = L.latLngBounds(adjusted.map((point) => [point.lat, point.lng]));
+      const padding = map.getSize().x < 640 ? 22 : 55;
+      map.fitBounds(bounds, { padding: [padding, padding], maxZoom: 5, animate: false });
+    }
+
+    function resetMapView() {
+      if (!map) return;
+      cancelPendingReveal();
+      map.setView([24, 24], 2, { animate: false });
+      restoreBaseWorld();
+    }
+
+    $("#regionFilters").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-region]");
+      if (!button) return;
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      state.region = button.dataset.region;
+      state.page = 1;
+      document.querySelectorAll("[data-region]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+      render();
+      fitResults(filteredPorts());
+    });
+
+    portSearch.addEventListener("input", () => {
+      cancelPendingReveal();
+      if (map) map.setView(map.getCenter(), map.getZoom(), { animate: false });
+      clearTimeout(searchTimer);
+      state.query = portSearch.value;
+      state.page = 1;
+      searchTimer = setTimeout(() => { searchTimer = null; render(); }, 140);
+    });
+    portSearch.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        clearTimeout(searchTimer);
+        searchTimer = null;
+        render();
+        fitResults(filteredPorts());
+      }
+    });
+    $("#directoryPagination").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-page]");
+      if (!button || button.disabled) return;
+      state.page = Number(button.dataset.page);
+      render(false);
+      $("#directory").scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth" });
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName) && drawer.hidden) {
+        event.preventDefault(); portSearch.focus(); $("#atlas").scrollIntoView({ behavior: "smooth" });
+      }
+      if (event.key === "Escape" && !drawer.hidden) closeDrawer();
+      if (event.key === "Tab" && !drawer.hidden) {
+        const focusable = [...drawer.querySelectorAll("button, a[href], input, [tabindex]:not([tabindex='-1'])")];
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    });
+
+    $("#heroSearchForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      state.query = $("#heroSearch").value;
+      portSearch.value = state.query;
+      state.region = "全部";
+      state.page = 1;
+      document.querySelectorAll("[data-region]").forEach((item) => item.setAttribute("aria-pressed", String(item.dataset.region === "全部")));
+      render();
+      const requestId = revealRequestId;
+      $("#atlas").scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth" });
+      fitTimer = setTimeout(() => {
+        fitTimer = null;
+        if (requestId === revealRequestId) fitResults(filteredPorts());
+      }, reducedMotion() ? 30 : 500);
+    });
+
+    $("#clearFilters").addEventListener("click", () => {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+      state.query = ""; state.region = "全部"; state.page = 1; portSearch.value = ""; $("#heroSearch").value = "";
+      document.querySelectorAll("[data-region]").forEach((item) => item.setAttribute("aria-pressed", String(item.dataset.region === "全部")));
+      render();
+      resetMapView();
+    });
+    $("#resetMap").addEventListener("click", resetMapView);
+    $("#drawerClose").addEventListener("click", closeDrawer);
+    drawerScrim.addEventListener("click", closeDrawer);
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add("is-visible"); observer.unobserve(entry.target); } });
+    }, { threshold: .12 });
+    document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
+
+    render();
+    initMap();
+  </script>
+</body>
+</html>

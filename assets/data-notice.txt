@@ -1,0 +1,10 @@
+PORTUS offline port data snapshot
+Source: NGA World Port Index (Pub. 150), April 2025 edition.
+Compilation: aashishvanand/seaport-data-js, CC BY 4.0.
+Upstream revision: https://github.com/aashishvanand/seaport-data-js/tree/60e3519449f169c6ce68fef3ecd313f5dfe2d73f
+Upstream JSON SHA-256: 8533511f020650b589371728d385a75f4f32ed4fd3ddb771b7213c587bf90e13
+License: https://creativecommons.org/licenses/by/4.0/
+Snapshot created: 2026-11-13. Records: 3802. Countries/territories: 193.
+Changes: fields trimmed, WGS84 coordinates rounded to 6 decimals, geographic groups and Chinese search aliases added, facility tags derived only from affirmative source fields. Missing values remain missing and are not treated as false.
+NGA source data is a U.S. Government work in the public domain. This reproduction is not approved, authorized or endorsed by the Secretary of Defense, the Director of National Intelligence, the Director, NGA or any other element of the U.S. Government. The U.S. Government and NGA accept no liability for the accuracy or quality of this reproduction or its use.
+Reference points and port particulars are not live operational data and must not be used for navigation, berth planning or vessel safety decisions.

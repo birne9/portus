@@ -51,7 +51,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           # The repository's branch-based Pages source also deploys this commit; publish the Vite artifact last.
-          run_id=$(gh run list --workflow "pages build and deployment" --commit "$COMMIT_SHA" --json databaseId --jq '.[0].databaseId // empty')
+          run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${COMMIT_SHA}&per_page=100" --jq '.workflow_runs | map(select(.name == "pages build and deployment")) | .[0].id // empty')
           if [ -n "$run_id" ]; then
             gh run watch "$run_id" --exit-status --interval 10
           fi
